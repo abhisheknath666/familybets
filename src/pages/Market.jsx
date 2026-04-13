@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGroup } from '../context/GroupContext'
 import { getYesPrice, calcPayoutPerShare, fmtPct } from '../lib/cpmm'
 import BetModal from '../components/BetModal'
+import { friendlyError } from '../lib/errors'
 
 export default function Market() {
   const { id } = useParams()

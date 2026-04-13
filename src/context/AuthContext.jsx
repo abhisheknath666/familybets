@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { friendlyError } from '../lib/errors'
 
 const AuthContext = createContext(null)
 
@@ -33,12 +34,12 @@ export function AuthProvider({ children }) {
       password,
       options: { data: { name } },
     })
-    return { data, error }
+    return { data, error: error ? new Error(friendlyError(error)) : null }
   }
 
   async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    return { data, error }
+    return { data, error: error ? new Error(friendlyError(error)) : null }
   }
 
   async function signOut() {

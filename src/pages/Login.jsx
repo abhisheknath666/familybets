@@ -9,15 +9,20 @@ export default function Login() {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error } = mode === 'signin'
-      ? await signIn(email, password)
-      : await signUp(email, password, name)
-    if (error) setError(error.message)
+    if (mode === 'signin') {
+      const { error } = await signIn(email, password)
+      if (error) setError(error.message)
+    } else {
+      const { data, error } = await signUp(email, password, name)
+      if (error) setError(error.message)
+      else if (!data.session) { setConfirmed(true); setMode('signin') } // email confirmation required
+    }
     setLoading(false)
   }
 
@@ -29,6 +34,16 @@ export default function Login() {
           <h1 className="text-2xl font-bold">FamilyBets</h1>
           <p className="text-gray-400 text-sm mt-1">Prediction markets for friends & family</p>
         </div>
+
+        {confirmed && (
+          <div className="card mb-4 border-green-700 bg-green-900/20 text-center">
+            <div className="text-3xl mb-2">📬</div>
+            <p className="font-semibold text-green-400">Check your email</p>
+            <p className="text-sm text-gray-400 mt-1">
+              We sent a confirmation link to <span className="text-white">{email}</span>. Click it to activate your account, then sign in.
+            </p>
+          </div>
+        )}
 
         <div className="card">
           <div className="flex rounded-xl bg-gray-800 p-1 mb-5">

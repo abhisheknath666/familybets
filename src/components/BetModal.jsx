@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { calcBuy, fmtPct } from '../lib/cpmm'
 import { useAuth } from '../context/AuthContext'
 import { useGroup } from '../context/GroupContext'
+import { friendlyError } from '../lib/errors'
 
 export default function BetModal({ market, onClose, onBetPlaced }) {
   const { session } = useAuth()
@@ -70,7 +71,7 @@ export default function BetModal({ market, onClose, onBetPlaced }) {
       onBetPlaced()
       onClose()
     } catch (err) {
-      setError(err.message || 'Something went wrong')
+      setError(friendlyError(err))
       setLoading(false)
     }
   }

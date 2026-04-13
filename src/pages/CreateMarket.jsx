@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useGroup } from '../context/GroupContext'
 import { INITIAL_LIQUIDITY } from '../lib/cpmm'
+import { friendlyError } from '../lib/errors'
 
 const CATEGORIES = ['Food', 'Fitness', 'Finance', 'Life', 'Fun']
 const CATEGORY_EMOJI = { Food: '🍕', Fitness: '💪', Finance: '💰', Life: '🎲', Fun: '🎉' }
@@ -52,7 +53,7 @@ export default function CreateMarket() {
       status: 'open',
     }).select().single()
 
-    if (error) { setError(error.message); setLoading(false); return }
+    if (error) { setError(friendlyError(error)); setLoading(false); return }
     navigate(`/market/${data.id}`)
   }
 

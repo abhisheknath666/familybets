@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { friendlyError } from '../lib/errors'
 
 const GroupContext = createContext(null)
 
@@ -43,37 +44,15 @@ export function GroupProvider({ children }) {
   }
 
   async function createGroup(name) {
-    const { data: grp, error } = await supabase
-      .from('groups')
-      .insert({ name, created_by: session.user.id })
-      .select()
-      .single()
-    if (error) return { error }
-
-    const { error: memErr } = await supabase
-      .from('group_members')
-      .insert({ user_id: session.user.id, group_id: grp.id })
-    if (memErr) return { error: memErr }
-
-    setGroup(grp)
+    const { data: grp, error } = await supabase.rpc('create_group', { group_name: name })
+    if (error) return { error: new Error(friendlyError(error)) }
     await loadGroup()
     return { data: grp }
   }
 
   async function joinGroup(joinCode) {
-    const { data: grp, error } = await supabase
-      .from('groups')
-      .select()
-      .eq('join_code', joinCode.toUpperCase())
-      .single()
-    if (error || !grp) return { error: error || new Error('Group not found') }
-
-    const { error: memErr } = await supabase
-      .from('group_members')
-      .insert({ user_id: session.user.id, group_id: grp.id })
-    if (memErr) return { error: memErr }
-
-    setGroup(grp)
+    const { data: grp, error } = await supabase.rpc('join_group', { code: joinCode })
+    if (error) return { error: new Error(friendlyError(error)) }
     await loadGroup()
     return { data: grp }
   }
