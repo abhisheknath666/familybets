@@ -22,6 +22,8 @@ export default function Market() {
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState(false)
   const [voting, setVoting] = useState(false)
+  const [pendingVote, setPendingVote] = useState(null) // 'YES' | 'NO' — awaiting confirm
+  const [openingVoting, setOpeningVoting] = useState(false)
 
   useEffect(() => {
     loadMarket()
@@ -57,7 +59,15 @@ export default function Market() {
     setUserVote(v?.find(v => v.user_id === session.user.id) || null)
   }
 
+  async function openVoting() {
+    setOpeningVoting(true)
+    await supabase.from('markets').update({ status: 'voting' }).eq('id', id)
+    await loadMarket()
+    setOpeningVoting(false)
+  }
+
   async function castVote(voteYes) {
+    setPendingVote(null)
     setVoting(true)
     await supabase.from('resolution_votes').upsert({ user_id: session.user.id, market_id: id, vote: voteYes })
     await loadVotes()
@@ -67,7 +77,8 @@ export default function Market() {
     const memberCount = members.length
     const yesVotes = allVotes.filter(v => v.vote).length
     const noVotes = allVotes.filter(v => !v.vote).length
-    const majority = Math.floor(memberCount / 2) + 1
+    // Require at least 2 votes OR all members have voted before resolving
+    const majority = Math.max(2, Math.floor(memberCount / 2) + 1)
 
     if (yesVotes >= majority) await resolveMarket(true)
     else if (noVotes >= majority) await resolveMarket(false)
@@ -134,8 +145,11 @@ export default function Market() {
   const yesVotes = votes.filter(v => v.vote).length
   const noVotes = votes.filter(v => !v.vote).length
 
-  const canBet = market.status === 'open' && new Date(market.close_date) > new Date()
-  const canVote = market.status === 'voting' || (market.status === 'open' && new Date(market.close_date) <= new Date())
+  const isExpired = new Date(market.close_date) <= new Date()
+  const isCreator = market.creator_id === session?.user?.id
+  const canBet = market.status === 'open' && !isExpired
+  const canOpenVoting = market.status === 'open' && isExpired && isCreator
+  const canVote = market.status === 'voting'
 
   return (
     <div className="space-y-4 pb-4">
@@ -212,32 +226,68 @@ export default function Market() {
         </button>
       )}
 
+      {/* Creator: close betting and open voting */}
+      {canOpenVoting && (
+        <div className="card border-yellow-800/40">
+          <p className="font-semibold mb-1">Betting closed</p>
+          <p className="text-sm text-gray-400 mb-3">The close date has passed. Open voting so the group can decide the outcome.</p>
+          <button onClick={openVoting} disabled={openingVoting} className="btn-primary w-full">
+            {openingVoting ? 'Opening…' : 'Open voting'}
+          </button>
+        </div>
+      )}
+
       {/* Resolution voting */}
-      {canVote && market.status !== 'resolved' && (
+      {canVote && (
         <div className="card">
-          <p className="font-semibold mb-1">Vote on outcome</p>
+          <p className="font-semibold mb-1">How did it resolve?</p>
           <p className="text-xs text-gray-500 mb-3">{market.resolution_criteria}</p>
-          <div className="flex gap-3 mb-3">
-            <button
-              onClick={() => castVote(true)}
-              disabled={voting || !!userVote}
-              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-                userVote?.vote === true ? 'bg-green-600 text-white' : 'btn-secondary'
-              }`}
-            >
-              YES ({yesVotes})
-            </button>
-            <button
-              onClick={() => castVote(false)}
-              disabled={voting || !!userVote}
-              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-                userVote?.vote === false ? 'bg-red-600 text-white' : 'btn-secondary'
-              }`}
-            >
-              NO ({noVotes})
-            </button>
-          </div>
-          {userVote && <p className="text-xs text-gray-500 text-center">Vote cast — resolves when majority is reached</p>}
+
+          {!userVote && !pendingVote && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPendingVote('YES')}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-gray-800 text-gray-300 hover:bg-green-700 hover:text-white transition-colors"
+              >
+                YES ({yesVotes})
+              </button>
+              <button
+                onClick={() => setPendingVote('NO')}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-gray-800 text-gray-300 hover:bg-red-700 hover:text-white transition-colors"
+              >
+                NO ({noVotes})
+              </button>
+            </div>
+          )}
+
+          {pendingVote && (
+            <div className="bg-gray-800 rounded-xl p-3 text-center">
+              <p className="text-sm text-gray-300 mb-3">
+                Confirm: this resolved <span className={`font-bold ${pendingVote === 'YES' ? 'text-green-400' : 'text-red-400'}`}>{pendingVote}</span>?
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setPendingVote(null)} className="flex-1 btn-secondary text-sm py-2">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => castVote(pendingVote === 'YES')}
+                  disabled={voting}
+                  className={`flex-1 text-sm py-2 rounded-xl font-semibold text-white transition-colors ${pendingVote === 'YES' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`}
+                >
+                  {voting ? 'Submitting…' : `Yes, it was ${pendingVote}`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {userVote && (
+            <div className="text-center">
+              <p className="text-sm text-gray-400">
+                You voted <span className={`font-semibold ${userVote.vote ? 'text-green-400' : 'text-red-400'}`}>{userVote.vote ? 'YES' : 'NO'}</span>
+              </p>
+              <p className="text-xs text-gray-600 mt-1">{yesVotes} YES · {noVotes} NO · resolves on majority</p>
+            </div>
+          )}
         </div>
       )}
 
