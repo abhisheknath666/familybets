@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const { signIn, signUp } = useAuth()
@@ -10,6 +11,16 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
+
+  async function handleResend() {
+    setResendLoading(true)
+    setResendMsg('')
+    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    setResendMsg(error ? 'Could not resend — try signing up again.' : 'Email resent! Check your inbox.')
+    setResendLoading(false)
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -42,6 +53,17 @@ export default function Login() {
             <p className="text-sm text-gray-400 mt-1">
               We sent a confirmation link to <span className="text-white">{email}</span>. Click it to activate your account, then sign in.
             </p>
+            <div className="mt-3 pt-3 border-t border-green-800/50">
+              <p className="text-xs text-gray-500 mb-2">Didn't get it? Check spam or</p>
+              <button
+                onClick={handleResend}
+                disabled={resendLoading}
+                className="text-sm text-green-400 hover:text-green-300 font-medium disabled:opacity-50"
+              >
+                {resendLoading ? 'Resending…' : 'Resend confirmation email'}
+              </button>
+              {resendMsg && <p className="text-xs mt-2 text-gray-300">{resendMsg}</p>}
+            </div>
           </div>
         )}
 
